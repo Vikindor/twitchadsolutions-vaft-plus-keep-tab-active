@@ -1,67 +1,52 @@
-Project archived on 2026-03-05. I'm no longer interested in Twitch. So much garbage content. Every time I go on the site it's worse.
+<h1 align="center">
+VAFT + Keep Tab Active
+</h1>
 
-# TwitchAdSolutions
+Merged userscript based on [TwitchAdSolutions (vaft)](https://github.com/pixeltris/TwitchAdSolutions) with integrated [Keep Tab Active](https://github.com/Vikindor/twitch-keep-tab-active) behavior.
 
-This repo aims to provide multiple solutions for blocking Twitch ads.
+This version is meant to replace the need to run a separate Twitch anti-ad script and a separate tab-activity script side by side. It keeps the core **vaft** ad-handling logic, while also adding the most useful parts of **Keep Tab Active** so Twitch is less likely to pause, mute, throttle, or de-prioritize playback in background tabs.
 
-**Don't combine Twitch specific ad blockers.**
+Particularly useful for those who want a single userscript for **ad handling + stable background playback**, including **Drops farming** and long passive viewing sessions.
 
-## Recommendations
+## ✨ Features
 
-Proxies are the most reliable way of avoiding ads ([buffering / downtime info](full-list.md#proxy-issues)).
+- Keeps the core **vaft** anti-ad logic and player recovery behavior.
+- Spoofs **visibility and focus** so Twitch treats the tab as active.
+- Helps keep the player **“in view”** for observer-based checks.
+- Sends light **activity pings** to reduce idle/background issues.
+- Automatically clicks **Start Watching** and similar recovery gates when they appear.
+- Keeps the script as a **single merged userscript** instead of relying on two overlapping scripts.
 
-- `TTV LOL PRO` - [chrome](https://chrome.google.com/webstore/detail/ttv-lol-pro/bpaoeijjlplfjbagceilcgbkcdjbomjd) / [firefox](https://addons.mozilla.org/addon/ttv-lol-pro/) / [code](https://github.com/younesaassila/ttv-lol-pro)
+## ➕ What Was Added From Keep Tab Active
 
-Alternatively:
+- Early spoofing of `visibilityState`, `hidden`, `webkitHidden`, `mozHidden`, and `hasFocus`.
+- `IntersectionObserver` patching for Twitch player/video elements.
+- Periodic light activity events.
+- `wakeLock` request when supported.
+- Automatic handling of content-gate / recovery buttons.
 
-- `Twitch Turbo` - https://www.twitch.tv/turbo
-- `Alternate Player for Twitch.tv` - [chrome](https://chrome.google.com/webstore/detail/alternate-player-for-twit/bhplkbgoehhhddaoolmakpocnenplmhf) / [firefox](https://addons.mozilla.org/en-US/firefox/addon/twitch_5/)
-- `Purple AdBlock` - [chrome](https://chrome.google.com/webstore/detail/purple-adblock/lkgcfobnmghhbhgekffaadadhmeoindg) / [firefox](https://addons.mozilla.org/en-US/firefox/addon/purpleadblock/) / [userscript](https://raw.githubusercontent.com/arthurbolsoni/Purple-adblock/refs/heads/main/platform/tampermonkey/dist/purpleadblocker.user.js) / [code](https://github.com/arthurbolsoni/Purple-adblock/)
-- `AdGuard Extra` - [chrome](https://chrome.google.com/webstore/detail/adguard-extra-beta/mglpocjcjbekdckiahfhagndealpkpbj) / [firefox](https://github.com/AdguardTeam/AdGuardExtra/#firefox) / [userscript](https://userscripts.adtidy.org/release/adguard-extra/1.0/adguard-extra.user.js)
-- `vaft` - see below
-- `TTV Ad Mute` - [firefox](https://addons.mozilla.org/en-US/firefox/addon/twitch-tv-ad-mute/) / [code](https://github.com/drj101687/ttv-ad-mute)
+## ➖ What Was Not Added
 
-[Read this for a full list and descriptions.](full-list.md)
+The original **Keep Tab Active** script also contains a more aggressive anti-pause layer that intercepts `HTMLMediaElement.pause()` and immediately tries to resume playback unless the pause came from a recent user gesture.
 
-[Also see this list maintained by @zGato.](https://github.com/zGato/ScrewTwitchAds)
+That part was intentionally left out here.
 
-## Scripts
+`vaft` already uses its own `pause()` / `play()` and reload-based recovery logic for buffering fixes and stream restoration. Overriding `pause()` globally on top of that would risk interfering with **vaft** itself, not just Twitch. This merged version keeps the compatibility-safe keep-active pieces and avoids the heavier anti-pause behavior.
 
-**There are better / easier to use methods in the above recommendations.**
+## 🚀 Installation
 
-- vaft - [userscript](https://github.com/pixeltris/TwitchAdSolutions/raw/master/vaft/vaft.user.js) / [ublock](https://raw.githubusercontent.com/pixeltris/TwitchAdSolutions/master/vaft/vaft-ublock-origin.js) / [ublock (permalink)](https://raw.githubusercontent.com/pixeltris/TwitchAdSolutions/f8f86706daf90daa534b26bce5b2f01238667d5f/vaft/vaft-ublock-origin.js)
-  - Attempts to get a clean stream as fast as it can
-  - If it fails to get a clean stream it removes ad segments (no playback until ad-free stream is found)
-- video-swap-new - [userscript](https://github.com/pixeltris/TwitchAdSolutions/raw/master/video-swap-new/video-swap-new.user.js) / [ublock](https://raw.githubusercontent.com/pixeltris/TwitchAdSolutions/master/video-swap-new/video-swap-new-ublock-origin.js) / [ublock (permalink)](https://raw.githubusercontent.com/pixeltris/TwitchAdSolutions/f8f86706daf90daa534b26bce5b2f01238667d5f/video-swap-new/video-swap-new-ublock-origin.js)
-  - Attempts to get a clean stream
-  - If it fails to get a clean stream it removes ad segments (no playback until ad-free stream is found)
-  - Not recommended, `vaft` is a better script
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or another userscript manager.
+2. Install the merged script:
+   - [vaft_keep_tab_active.js](./vaft_keep_tab_active.js)
 
-## Applying a script (uBlock Origin)
+## ⚙ High-Level Behavior
 
-- Navigate to the uBlock Origin Dashboard (the extension options)
-- Under the `My filters` tab add `twitch.tv##+js(twitch-videoad)`.
-- Under the `Settings` tab, enable `I am an advanced user`, then click the cog that appears. Modify the value of `userResourcesLocation` from `unset` to the full url of the solution you wish to use (if a url is already in use, add a space after the existing url). e.g. `userResourcesLocation https://raw.githubusercontent.com/pixeltris/TwitchAdSolutions/master/vaft/vaft-ublock-origin.js` 
-- To ensure uBlock Origin loads the script I recommend that you disable/enable the uBlock Origin extension (or restart your browser).
+- `vaft` handles Twitch ad-related worker / stream / player logic.
+- The merged keep-active layer makes the page report itself as visible and focused.
+- The player is treated as visible by observer-based checks.
+- Small UI interruptions such as “Start Watching” overlays are auto-cleared.
+- Background playback is made more stable without overriding all programmatic pauses.
 
-To stop using a script remove the filter and make the url `unset`.
+## ⚠️ Notes & Limitations
 
-*For the sake of security it's recommended to use a permalink when using uBlock Origin (permalinks do not auto update).*
-
-*The scripts __may randomly stop being applied by uBlock Origin__ for unknown reasons ([#200](https://github.com/pixeltris/TwitchAdSolutions/issues/200)). It's recommended to use the userscript versions instead.*
-
-## Applying a script (userscript)
-
-Viewing one of the userscript files should prompt the given script to be added when you have a userscript manager installed.
-
-Userscript managers:
-
-- https://violentmonkey.github.io/
-- https://www.tampermonkey.net/
-- https://apps.apple.com/us/app/userscripts/id1463298887
-
-*Greasemonkey doesn't work with the scripts.*
-
-## Issues with the scripts
-
-If the script doesn't work or you're experiencing freezing / buffering issues see [issues.md](issues.md)
+- Other Twitch extensions or userscripts that patch the same browser/player APIs may still conflict.

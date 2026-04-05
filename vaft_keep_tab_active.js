@@ -1,16 +1,18 @@
 // ==UserScript==
-// @name         TwitchAdSolutions (vaft)
-// @namespace    https://github.com/pixeltris/TwitchAdSolutions
-// @version      37.0.0
-// @description  Multiple solutions for blocking Twitch ads (vaft)
-// @updateURL    https://github.com/pixeltris/TwitchAdSolutions/raw/master/vaft/vaft.user.js
-// @downloadURL  https://github.com/pixeltris/TwitchAdSolutions/raw/master/vaft/vaft.user.js
-// @author       https://github.com/cleanlock/VideoAdBlockForTwitch#credits
+// @name         VAFT + Keep Tab Active
+// @namespace    vaft-keep-tab-active
+// @version      1.0.0
+// @description  Multiple solutions for blocking Twitch ads (vaft) with integrated Keep Tab Active behavior
+// @author       pixeltris, https://github.com/cleanlock/VideoAdBlockForTwitch#credits, Vikindor (https://vikindor.github.io/)
+// @homepageURL  https://github.com/Vikindor/twitchadsolutions-vaft-plus-keep-tab-active
+// @supportURL   https://github.com/Vikindor/twitchadsolutions-vaft-plus-keep-tab-active/issues
+// @license      MIT
 // @match        *://*.twitch.tv/*
 // @run-at       document-start
 // @inject-into  page
 // @grant        none
 // ==/UserScript==
+
 (function() {
     'use strict';
     const ourTwitchAdSolutionsVersion = 24;// Used to prevent conflicts with outdated versions of the scripts
@@ -20,6 +22,11 @@
         return;
     }
     window.twitchAdSolutionsVersion = ourTwitchAdSolutionsVersion;
+    const keepActivePatchTag = 'vaftKeepTabActive';
+    let keepAliveIntervalId = null;
+    let keepActiveDomFeaturesInstalled = false;
+    let lastStartWatchingClick = 0;
+    let lastOverlayHandled = 0;
     function declareOptions(scope) {
         scope.AdSignifier = 'stitched';
         scope.ClientID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
@@ -57,6 +64,120 @@
         scope.IsAdStrippingEnabled = true;
         scope.AdSegmentCache = new Map();
         scope.AllSegmentsAreAdSegments = false;
+    }
+    function defineConstProp(proto, prop, val) {
+        try {
+            const descriptor = Object.getOwnPropertyDescriptor(proto, prop);
+            if (descriptor?.get && String(descriptor.get).includes(keepActivePatchTag)) {
+                return;
+            }
+            Object.defineProperty(proto, prop, {
+                configurable: true,
+                enumerable: true,
+                get: function vaftKeepTabActive() {
+                    return val;
+                }
+            });
+        } catch {}
+    }
+    function installEarlyKeepTabActivePatches() {
+        const docProto = (window.Document && window.Document.prototype) || Document.prototype;
+        defineConstProp(docProto, 'hidden', false);
+        defineConstProp(docProto, 'webkitHidden', false);
+        defineConstProp(docProto, 'mozHidden', false);
+        defineConstProp(docProto, 'visibilityState', 'visible');
+        try {
+            Object.defineProperty(docProto, 'hasFocus', {
+                configurable: true,
+                value: function() {
+                    return true;
+                }
+            });
+        } catch {}
+        const NativeIO = window.IntersectionObserver;
+        if (typeof NativeIO === 'function' && !NativeIO.__vaftKeepTabActivePatched) {
+            const IOProxy = function(callback, options) {
+                const wrapped = function(entries, observer) {
+                    const patched = entries.map((entry) => {
+                        const target = entry.target;
+                        const isVideoish = target?.tagName === 'VIDEO'
+                            || target?.closest?.('[data-a-target="player-overlay"],[data-a-target="player-container"]');
+                        if (isVideoish) {
+                            const rect = target.getBoundingClientRect?.();
+                            return Object.assign({}, entry, {
+                                isIntersecting: true,
+                                intersectionRatio: 1,
+                                boundingClientRect: rect || entry.boundingClientRect,
+                                intersectionRect: rect || entry.intersectionRect,
+                                rootBounds: entry.rootBounds
+                            });
+                        }
+                        return entry;
+                    });
+                    try {
+                        return callback(patched, observer);
+                    } catch {}
+                };
+                return new NativeIO(wrapped, options);
+            };
+            IOProxy.prototype = NativeIO.prototype;
+            Object.defineProperty(IOProxy, '__vaftKeepTabActivePatched', {
+                value: true
+            });
+            window.IntersectionObserver = IOProxy;
+        }
+    }
+    function installDomKeepActiveFeatures() {
+        if (keepActiveDomFeaturesInstalled || !document.documentElement) {
+            return;
+        }
+        keepActiveDomFeaturesInstalled = true;
+        if (keepAliveIntervalId === null) {
+            keepAliveIntervalId = window.setInterval(() => {
+                try {
+                    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+                } catch {}
+            }, 30000);
+        }
+        try {
+            window.navigator.wakeLock?.request?.('screen').catch(() => {});
+        } catch {}
+        const tryClickStartWatching = () => {
+            const now = Date.now();
+            if (now - lastStartWatchingClick < 3000) {
+                return;
+            }
+            const button = document.querySelector('[data-a-target="content-classification-gate-overlay-start-watching-button"]');
+            if (button && !button.disabled) {
+                lastStartWatchingClick = now;
+                button.click();
+            }
+        };
+        const tryRecoverStream = () => {
+            const overlay = document.querySelector('[data-a-target="player-overlay-content-gate"]');
+            if (!overlay) {
+                return;
+            }
+            const now = Date.now();
+            if (now - lastOverlayHandled < 3000) {
+                return;
+            }
+            const button = overlay.querySelector('button:not([disabled])');
+            if (button) {
+                lastOverlayHandled = now;
+                button.click();
+            }
+        };
+        const handleKeepAliveUi = () => {
+            tryClickStartWatching();
+            tryRecoverStream();
+        };
+        new MutationObserver(handleKeepAliveUi).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true
+        });
+        handleKeepAliveUi();
     }
     let isActivelyStrippingAds = false;
     let localStorageHookFailed = false;
@@ -995,6 +1116,7 @@
         };
     }
     function onContentLoaded() {
+        installDomKeepActiveFeatures();
         // This stops Twitch from pausing the player when in another tab and an ad shows.
         // Taken from https://github.com/saucettv/VideoAdBlockForTwitch/blob/cefce9d2b565769c77e3666ac8234c3acfe20d83/chrome/content.js#L30
         try {
@@ -1093,6 +1215,7 @@
             localStorageHookFailed = true;
         }
     }
+    installEarlyKeepTabActivePatches();
     declareOptions(window);
     hookWindowWorker();
     hookFetch();
