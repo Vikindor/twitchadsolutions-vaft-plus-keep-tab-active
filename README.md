@@ -17,7 +17,7 @@ Particularly useful for those who want a single userscript for **ad handling + s
 - Automatically clicks **Start Watching** and similar recovery gates when they appear.
 - Keeps the script as a **single merged userscript** instead of relying on two overlapping scripts.
 
-## ➕ What Was Added From Keep Tab Active
+## ➕ What was added from Keep Tab Active
 
 - Early spoofing of `visibilityState`, `hidden`, `webkitHidden`, `mozHidden`, and `hasFocus`.
 - `IntersectionObserver` patching for Twitch player/video elements.
@@ -25,7 +25,7 @@ Particularly useful for those who want a single userscript for **ad handling + s
 - `wakeLock` request when supported.
 - Automatic handling of content-gate / recovery buttons.
 
-## ➖ What Was Not Added
+## ➖ What was not added
 
 The original **Keep Tab Active** script also contains a more aggressive anti-pause layer that intercepts `HTMLMediaElement.pause()` and immediately tries to resume playback unless the pause came from a recent user gesture.
 
@@ -39,7 +39,7 @@ That part was intentionally left out here.
 2. Install the merged script:
    - [vaft_keep_tab_active.js](./vaft_keep_tab_active.js)
 
-## ⚙ High-Level Behavior
+## ⚙ How it works (high-level)
 
 - `vaft` handles Twitch ad-related worker / stream / player logic.
 - The merged keep-active layer makes the page report itself as visible and focused.
