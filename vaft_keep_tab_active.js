@@ -6,7 +6,7 @@
 // @author       pixeltris, https://github.com/cleanlock/VideoAdBlockForTwitch#credits, Vikindor (https://vikindor.github.io/)
 // @homepageURL  https://github.com/Vikindor/twitchadsolutions-vaft-plus-keep-tab-active
 // @supportURL   https://github.com/Vikindor/twitchadsolutions-vaft-plus-keep-tab-active/issues
-// @license      MIT
+// @license      GPL-3.0
 // @match        *://*.twitch.tv/*
 // @run-at       document-start
 // @inject-into  page
