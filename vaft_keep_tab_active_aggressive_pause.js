@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         VAFT + Keep Tab Active
 // @namespace    vaft-keep-tab-active
-// @version      2.0.0
+// @version      2.1.0
 // @description  Multiple solutions for blocking Twitch ads (vaft) with integrated Keep Tab Active behavior
 // @author       pixeltris, https://github.com/cleanlock/VideoAdBlockForTwitch#credits, Vikindor (https://vikindor.github.io/)
 // @homepageURL  https://github.com/Vikindor/twitchadsolutions-vaft-plus-keep-tab-active
@@ -24,12 +24,23 @@
   window.twitchAdSolutionsVersion = ourTwitchAdSolutionsVersion;
   const keepActivePatchTag = 'vaftKeepTabActive';
   const userGestureWindowMs = 1200;
+  const playbackStallCheckDelay = 1500;
+  const playbackStallBufferSeconds = 3;
+  const playbackStallSoftResumeThreshold = 3;
+  const playbackStallReloadThreshold = 6;
+  const playbackStallRecoveryCooldownMs = 12000;
   let keepAliveIntervalId = null;
   let keepActiveDomFeaturesInstalled = false;
   let pauseGuardInstalled = false;
+  let playbackStallMonitorInstalled = false;
   let lastStartWatchingClick = 0;
   let lastOverlayHandled = 0;
   let lastUserGesture = 0;
+  const playbackStallState = {
+    lastCurrentTime: null,
+    stagnantChecks: 0,
+    lastRecoveryTime: 0
+  };
   function declareOptions(scope) {
     scope.AdSignifier = 'stitched';
     scope.ClientID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
@@ -299,6 +310,84 @@
         subtree: true
       });
     }
+  }
+  function getManagedVideoElement() {
+    const playerVideo = document.querySelector('.video-player video');
+    if (isManagedMediaElement(playerVideo)) {
+      return playerVideo;
+    }
+    const videos = document.getElementsByTagName('video');
+    for (let i = 0; i < videos.length; i++) {
+      if (isManagedMediaElement(videos[i])) {
+        return videos[i];
+      }
+    }
+    return null;
+  }
+  function getBufferedAhead(mediaElement) {
+    try {
+      const currentTime = mediaElement.currentTime;
+      const buffered = mediaElement.buffered;
+      if (!buffered || buffered.length === 0) {
+        return 0;
+      }
+      for (let i = 0; i < buffered.length; i++) {
+        if (buffered.start(i) <= currentTime && buffered.end(i) >= currentTime) {
+          return Math.max(0, buffered.end(i) - currentTime);
+        }
+      }
+    } catch {}
+    return 0;
+  }
+  function resetPlaybackStallState() {
+    playbackStallState.lastCurrentTime = null;
+    playbackStallState.stagnantChecks = 0;
+  }
+  function trySoftResumeManagedVideo(mediaElement) {
+    try {
+      const playPromise = mediaElement.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {});
+      }
+    } catch {}
+  }
+  function monitorPlaybackStall() {
+    const mediaElement = getManagedVideoElement();
+    if (!mediaElement || mediaElement.ended || mediaElement.paused || mediaElement.readyState < 3) {
+      resetPlaybackStallState();
+      setTimeout(monitorPlaybackStall, playbackStallCheckDelay);
+      return;
+    }
+    const bufferedAhead = getBufferedAhead(mediaElement);
+    if (bufferedAhead < playbackStallBufferSeconds) {
+      resetPlaybackStallState();
+      setTimeout(monitorPlaybackStall, playbackStallCheckDelay);
+      return;
+    }
+    const currentTime = mediaElement.currentTime;
+    if (playbackStallState.lastCurrentTime !== null && Math.abs(currentTime - playbackStallState.lastCurrentTime) < 0.01) {
+      playbackStallState.stagnantChecks++;
+    } else {
+      playbackStallState.stagnantChecks = 0;
+    }
+    playbackStallState.lastCurrentTime = currentTime;
+    const now = Date.now();
+    if (playbackStallState.stagnantChecks >= playbackStallReloadThreshold && now - playbackStallState.lastRecoveryTime >= playbackStallRecoveryCooldownMs) {
+      playbackStallState.lastRecoveryTime = now;
+      playbackStallState.stagnantChecks = 0;
+      doTwitchPlayerTask(false, true);
+    } else if (playbackStallState.stagnantChecks >= playbackStallSoftResumeThreshold && now - playbackStallState.lastRecoveryTime >= playbackStallCheckDelay) {
+      playbackStallState.lastRecoveryTime = now;
+      trySoftResumeManagedVideo(mediaElement);
+    }
+    setTimeout(monitorPlaybackStall, playbackStallCheckDelay);
+  }
+  function installPlaybackStallMonitor() {
+    if (playbackStallMonitorInstalled) {
+      return;
+    }
+    playbackStallMonitorInstalled = true;
+    monitorPlaybackStall();
   }
   let isActivelyStrippingAds = false;
   let localStorageHookFailed = false;
@@ -1229,6 +1318,7 @@
   }
   function onContentLoaded() {
     installDomKeepActiveFeatures();
+    installPlaybackStallMonitor();
 
     const docProto = (window.Document && window.Document.prototype) || Document.prototype;
     const hiddenGetter = getPrototypeGetter(docProto, 'hidden');
