@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         VAFT + Keep Tab Active
-// @namespace    vaft-keep-tab-active
+// @namespace    vaft-plus-keep-tab-active
 // @version      2.1.0
 // @description  Multiple solutions for blocking Twitch ads (vaft) with integrated Keep Tab Active behavior
 // @author       pixeltris, https://github.com/cleanlock/VideoAdBlockForTwitch#credits, Vikindor (https://vikindor.github.io/)
